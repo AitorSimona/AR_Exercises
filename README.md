@@ -1,2 +1,2 @@
 # AR_Exercises
- Just a repo to dump in exercised from AR subject
+ Just a repo to dump in exercises from AR subject
