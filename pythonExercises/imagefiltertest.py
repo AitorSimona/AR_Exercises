@@ -25,6 +25,27 @@ def convolve(img, krn, ksize, krad):
 
     return filter
 
+def convolvegrayscale(img, krn, ksize, krad):
+
+    height, width = img.shape
+    
+    frm = np.ones((height + krad*2,                   
+     width + krad*2))
+    frm[krad: -krad, krad: -krad] = img
+
+    #filteted image(output)
+    filter = np.zeros(img.shape)
+    for i in range (0, height):
+        for j in range (0,width):
+
+            g = (frm[i:i+ksize, j:j+ksize] * krn).sum()
+            filter[i,j] = g
+
+            #filter[i,j] = (frm[i:i+ksize, j:j+ksize]*krn[:,:,np.newaxis]).sum(axis=(0,1))
+
+
+    return filter
+
 def gaussianKernel(krad):
 
     # Create empty matrix
@@ -68,22 +89,33 @@ def gaussianFilter(img):
 def sobelFilter(img):
 
     # Kernel definition
-    ksize = 61      # kernel size
+    ksize = 3      # kernel size
     krad = int(ksize/2) #kernel radius 
-    krn =  krn.reshape(3,3)# normalize kernel
+    krn = np.zeros((ksize,ksize))
+    list = [[-1,0,1],[-2,0,2],[-1,0,1]]
+    krn = np.array(list)
+    krn2 = np.transpose(krn)
+    print(krn)
+    print(krn2)
 
-    #krn2 = sobelKernel(krad) # normalize kernel
+    # Create the gradient in x and in y
+    img_x = convolvegrayscale(img, krn, ksize, krad)
+    img_y = convolvegrayscale(img, krn2, ksize, krad)
 
-    return convolve(img, krn, ksize, krad)
+    # Use both 
+    G = np.sqrt(img_x**2 + img_y**2)
+
+    return G
 
 
 
 
-img = cv2.imread("vegetto.png", cv2.IMREAD_ANYCOLOR)
+
+img = cv2.imread("vegetto.png", cv2.IMREAD_GRAYSCALE)
 img = img / 255.0
 
-
-filtered = gaussianFilter(img)
+filtered = sobelFilter(img)
+filtered = filtered/filtered.max()
 
 cv2.imshow("Original",img)
 cv2.imshow("Filtered", filtered)
