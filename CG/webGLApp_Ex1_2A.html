@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>WebGL Application</title>
+        <meta charset="utf-8">
+        <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+
+        <script type="text/javascript" src="glMatrix-0.9.5.min.js"></script>
+        <script type="text/javascript" src="webgl-utils.js"></script>
+
+        <script id="shader-vs" type="x-shader/x-vertex">
+            attribute vec3 aVertexPosition;
+            attribute vec3 aVertexColor;
+
+            uniform mat4 uMVMatrix;
+            uniform mat4 uPMatrix;
+            varying vec3 vColor;
+
+            void main(void) {
+                vColor = aVertexColor;
+                gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+            }
+        </script>
+        
+        <script id="shader-fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            varying vec3 vColor;
+
+            void main(void) {
+                //gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+                gl_FragColor = vec4(vColor.x, vColor.y, vColor.z, 1.0);
+            }
+        </script>
+        
+        <script type="text/javascript">
+
+            // Global variables
+            var gl;
+            var resources = {}; // object
+            var entities = []; // list
+            var shaderProgram;
+            var triangleVertexPositionBuffer;
+            var triangleVertexColorBuffer;
+            var triangleVertexColorBuffer2;
+
+            var quadVertexPositionBuffer;
+            var quadVertexColorBuffer;
+
+
+            function initGL(canvas)
+            {    
+                var canvas = document.getElementById("webGL-canvas");
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+
+                try {
+                    gl = canvas.getContext("experimental-webgl");
+                    gl.viewportWidth = canvas.width;
+                    gl.viewportHeight = canvas.height;
+                } catch (e) {
+                }
+                if (!gl) {
+                    alert("Could not initialise WebGL, sorry :-(");
+                }
+            }
+
+
+            function getShader(id)
+            {
+                var shaderScript = document.getElementById(id);
+                if (!shaderScript) {
+                    return null;
+                }
+
+                var str = "";
+                var k = shaderScript.firstChild;
+                while (k) {
+                    if (k.nodeType == 3) {
+                        str += k.textContent;
+                    }
+                    k = k.nextSibling;
+                }
+
+                var shader;
+                if (shaderScript.type == "x-shader/x-fragment") {
+                    shader = gl.createShader(gl.FRAGMENT_SHADER);
+                } else if (shaderScript.type == "x-shader/x-vertex") {
+                    shader = gl.createShader(gl.VERTEX_SHADER);
+                } else {
+                    return null;
+                }
+
+                gl.shaderSource(shader, str);
+                gl.compileShader(shader);
+
+                if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                    alert(gl.getShaderInfoLog(shader));
+                    return null;
+                }
+
+                return shader;
+            }
+
+
+            function initShaders()
+            {
+                var fragmentShader = getShader("shader-fs");
+                var vertexShader = getShader("shader-vs");
+
+                shaderProgram = gl.createProgram();
+                gl.attachShader(shaderProgram, vertexShader);
+                gl.attachShader(shaderProgram, fragmentShader);
+                gl.linkProgram(shaderProgram);
+
+                if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+                    alert("Could not initialise shaders");
+                }
+
+                gl.useProgram(shaderProgram);
+
+
+                // --- Get attribute location ---
+                shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+                gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+                // TODO: handler to color attribute needed
+                shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
+                gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
+
+                // --- Get uniform location ---
+                shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+                shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
+            }
+
+            
+            function loadSceneOnGPU()
+            {
+                
+                // --- Create buffer in GPU ---
+                triangleVertexPositionBuffer = gl.createBuffer();
+
+                // --- Bind created buffer and send data ---
+                gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+                var vertices = [
+                     0.0, 0.5, 0.0,
+                    -0.5, -0.5, 0.0,
+                     0.5, -0.5, 0.0
+                ];
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+                triangleVertexPositionBuffer.itemSize = 3; // size of vertex data (float3)
+                triangleVertexPositionBuffer.numItems = 3; // number of vertices
+
+                // --- Create buffer in GPU ---
+                quadVertexPositionBuffer = gl.createBuffer();
+
+                // --- Bind created buffer and send data ---
+                gl.bindBuffer(gl.ARRAY_BUFFER, quadVertexPositionBuffer);
+                var Qvertices = [
+                    -0.5, 0.5, 0.0,
+                    -0.5,-0.5, 0.0,
+                     0.5, 0.5, 0.0,
+                    -0.5,-0.5, 0.0,
+                     0.5,-0.5, 0.0,
+                     0.5, 0.5, 0.0,
+                ];
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(Qvertices), gl.STATIC_DRAW);
+                quadVertexPositionBuffer.itemSize = 3; // size of vertex data (float3)
+                quadVertexPositionBuffer.numItems = 6; // number of vertices
+
+                // TODO: Create vertex color buffers
+
+                triangleVertexColorBuffer = gl.createBuffer();
+                triangleVertexColorBuffer2 = gl.createBuffer();
+                quadVertexColorBuffer = gl.createBuffer();
+
+                var colors1 = [
+                     1.0, 0.0, 0.0,
+                     0.0, 1.0, 0.0,
+                     0.0, 0.0, 1.0
+                ];
+
+                var colors2 = [
+                     1.0, 1.0, 0.0,
+                     1.0, 0.0, 1.0,
+                     0.0, 1.0, 1.0
+                ];
+                
+                var colors3 = [
+                     1.0, 1.0, 0.0,
+                     1.0, 1.0, 0.0,
+                     1.0, 1.0, 0.0,
+                     1.0, 1.0, 0.0,
+                     1.0, 1.0, 0.0,
+                     1.0, 1.0, 0.0
+                ];
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexColorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors1), gl.STATIC_DRAW);
+                triangleVertexColorBuffer.itemSize = 3; // size of vertex data (float3)
+                triangleVertexColorBuffer.numItems = 3; // number of vertices
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexColorBuffer2);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors2), gl.STATIC_DRAW);
+                triangleVertexColorBuffer2.itemSize = 3; // size of vertex data (float3)
+                triangleVertexColorBuffer2.numItems = 3; // number of vertices
+
+                gl.bindBuffer(gl.ARRAY_BUFFER, quadVertexColorBuffer);
+                gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors3), gl.STATIC_DRAW);
+                quadVertexColorBuffer.itemSize = 3; // size of vertex data (float3)
+                quadVertexColorBuffer.numItems = 6; // number of vertices
+            }
+
+
+            function drawScene()
+            {
+                // --- Enable gl cap z testing ---
+                gl.enable(gl.DEPTH_TEST);
+
+                // --- Set gl viewport ---
+                gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+
+                // --- Clear viewport buffer ---
+                gl.clearColor(0.0, 0.0, 0.0, 1.0);
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+                
+                // --- Bind model buffers ---
+                gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+             
+                // --- Set projection matrix ---
+                var pMatrix = mat4.create();
+                mat4.perspective(45, gl.viewportWidth / gl.viewportHeight, 0.1, 100.0, pMatrix);
+
+                // --- Set model and view matrices (modelview) ---
+                var mvMatrix = mat4.create();
+                mat4.identity(mvMatrix);
+                mat4.translate(mvMatrix, [0.0, 1.0, -10.0]);
+
+                var mvMatrix2 = mat4.create();
+                mat4.identity(mvMatrix2);
+                mat4.translate(mvMatrix2, [0.0, -0.5, -10.0]);
+                mat4.scale(mvMatrix2, [1.0, -1.0, 1.0]);
+
+                var mvMatrix3 = mat4.create();
+                mat4.identity(mvMatrix3);
+                mat4.translate(mvMatrix3, [1.5, 0.25, -10.0]);
+
+                var mvMatrix4 = mat4.create();
+                mat4.identity(mvMatrix4);
+                mat4.translate(mvMatrix4, [-1.5, 0.25, -10.0]);
+                mat4.rotate(mvMatrix4, 3.1415 * 0.25, [0.0, 0.0, 1.0]);
+
+                
+                // --- Send projection to shader ---
+                gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+
+                // --- Draw meshes (now primitives) ---
+                drawMesh(shaderProgram, mvMatrix, triangleVertexPositionBuffer, triangleVertexColorBuffer);
+                drawMesh(shaderProgram, mvMatrix2, triangleVertexPositionBuffer,triangleVertexColorBuffer2);
+                drawMesh(shaderProgram,mvMatrix3,quadVertexPositionBuffer, quadVertexColorBuffer);
+                drawMesh(shaderProgram,mvMatrix4,quadVertexPositionBuffer,quadVertexColorBuffer);
+            }
+
+            function drawMesh(shader, modelview, vbuffer, cbuffer)
+            {
+                 // --- Bind model VAO ---
+                gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
+                gl.vertexAttribPointer(shader.vertexPositionAttribute, vbuffer.itemSize, gl.FLOAT, false, 0, 0);
+               
+                gl.bindBuffer(gl.ARRAY_BUFFER, cbuffer);
+                gl.vertexAttribPointer(shader.vertexColorAttribute, cbuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+                // --- Send modelview to shader ---
+                gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, modelview);
+
+                // --- Draw vertices ---
+                gl.drawArrays(gl.TRIANGLES, 0, vbuffer.numItems);
+            }
+
+
+
+            function webGLStart()
+            {
+                // --- Initialize webgl ---
+                initGL();
+
+                // --- Create shaders ---
+                initShaders();
+
+                // --- Send buffers to gpu ---
+                loadSceneOnGPU();
+                
+                // --- Render all objects ---
+                drawScene();
+            }
+
+        </script>
+
+    </head>
+
+    <body onload="webGLStart();" onresize="webGLStart();">
+        <canvas id="webGL-canvas" style="border: none; width:100%; height:100%; margin: 0 auto;"></canvas>    
+    </body>
+
+</html>
