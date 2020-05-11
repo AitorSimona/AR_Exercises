@@ -21,10 +21,12 @@
             varying vec2 vTexCoords;
             varying vec3 vNormal;
             varying vec3 vLight;
+            varying vec4 positionEye;
 
             void main(void) {
-                vNormal = vec3(uNormalMatrix * aVertexNormal);  // if using view vec4 with last param as 0, so no translate is applied 
+                vNormal = normalize(uNormalMatrix * aVertexNormal);  // if using view vec4 with last param as 0, so no translate is applied 
                 vLight = vec3(uNormalMatrix * vec3(0.0, 1.0, 0.0)); // if using view vec4 (0.0, 1.0, 0.0, 0.0)
+                positionEye = uViewMatrix * uModelMatrix * vec4(aVertexPosition, 1.0);
 
                 vTexCoords = aVertexTexCoords;
                 gl_Position = uPMatrix * uViewMatrix * uModelMatrix * vec4(aVertexPosition, 1.0);
@@ -36,6 +38,7 @@
             varying vec2 vTexCoords;
             varying vec3 vNormal;
             varying vec3 vLight;
+            varying vec4 positionEye;
 
             uniform sampler2D diffuse;
 
@@ -49,8 +52,8 @@
                 vec3 lightColor = vec3(1.0);
 
                 vec3 N = normalize(vNormal);
-                vec3 L = normalize(vLight); // Light direction 
-
+                vec3 L = normalize(vLight - positionEye.xyz); // Light direction 
+                vec3 V = normalize(-positionEye.xyz);
                 // Ambient
                 float ambientIntensity = 0.3;
                 vec3 ambientColor = albedo * ambientIntensity;
@@ -60,12 +63,16 @@
                 vec3 diffuseColor = albedo * lightColor * diffuseIntensity;
 
                 // Specular
-                vec3 specularColor = vec3(0.0);
+                vec3 R = reflect(-L, N);
+                float specularIntensity = pow(max(dot(R, V), 0.0), shininess);
+                vec3 materialSpecular = vec3(1.0);
 
+                vec3 specularColor = materialSpecular*lightColor * specularIntensity;
+
+                // Final color
                 vec3 color = ambientColor + diffuseColor + specularColor;
 
-                gl_FragColor = vec4(N,1.0);
-                //gl_FragColor = vec4(1.0,0.0,0.0,1.0);
+                //gl_FragColor = vec4(N,1.0);
                 gl_FragColor = vec4(color,1.0);
             }
         </script>
